@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cinderpine Express — 3D Pixel-Art Autumn Fairground & Coaster Diorama</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bevan:ital@0;1&family=Hanken+Grotesk:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-booth: rgba(24, 17, 29, 0.92);
+      --bg-marquee: rgba(18, 12, 23, 0.94);
+      --border-brass: #d4a63b;
+      --border-brass-dim: rgba(212, 166, 59, 0.42);
+      --text-main: #f4e9d1;
+      --text-muted: #b8a693;
+      --ticket-bg: #f4e9d1;
+      --ticket-bg-active: #fff8e8;
+      --ticket-text: #2a1a1f;
+      --cherry: #d9383a;
+      --cherry-dark: #9e2424;
+      --gold: #f2c94c;
+      --teal: #397d8a;
+    }
+
+    body.theme-light {
+      --bg-booth: rgba(244, 233, 209, 0.94);
+      --bg-marquee: rgba(42, 26, 36, 0.94);
+      --border-brass: #9e6d1e;
+      --border-brass-dim: rgba(158, 109, 30, 0.38);
+      --text-main: #2a1a1f;
+      --text-muted: #6e5246;
+      --ticket-bg: #fffbf0;
+      --ticket-bg-active: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #120d18;
+      font-family: 'Hanken Grotesk', sans-serif;
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* TOP DARK MARQUEE HUD */
+    #top-marquee-bar {
+      position: fixed;
+      top: 12px;
+      left: 14px;
+      right: 14px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+      flex-wrap: wrap;
+    }
+
+    .marquee-brand {
+      pointer-events: auto;
+      background: var(--bg-marquee);
+      border: 2px solid var(--border-brass);
+      border-radius: 10px;
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 12px rgba(242, 201, 76, 0.12);
+    }
+
+    .brand-bulbs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .brand-bulbs span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 6px var(--gold);
+      animation: bulbPulse 1.6s infinite alternate;
+    }
+    .brand-bulbs span:nth-child(2) {
+      animation-delay: 0.8s;
+    }
+    @keyframes bulbPulse {
+      0% { opacity: 0.45; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1.1); }
+    }
+
+    .brand-title {
+      font-family: 'Bevan', serif;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      color: #f4e9d1;
+      text-shadow: 0 2px 0 #661a18;
+      line-height: 1.05;
+    }
+    .brand-sub {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* TELEMETRY MARQUEE READOUTS */
+    .marquee-hud {
+      pointer-events: auto;
+      background: var(--bg-marquee);
+      border: 2px solid var(--border-brass);
+      border-radius: 10px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+      color: #f4e9d1;
+    }
+
+    .hud-cell {
+      display: flex;
+      flex-direction: column;
+      min-width: 58px;
+    }
+    .hud-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: #b8a693;
+      font-weight: 700;
+    }
+    .hud-val {
+      font-family: 'Bevan', serif;
+      font-size: 16px;
+      color: var(--gold);
+      line-height: 1.15;
+    }
+    .hud-unit {
+      font-family: 'Hanken Grotesk', sans-serif;
+      font-size: 10px;
+      color: #d4c5a9;
+      margin-left: 2px;
+    }
+
+    .hud-g-gauge {
+      width: 68px;
+    }
+    .g-bar-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 3px;
+    }
+    #hud-g-fill {
+      width: 36%;
+      height: 100%;
+      background: var(--gold);
+      transition: width 0.08s linear;
+    }
+
+    .hud-section-cell {
+      min-width: 132px;
+      border-left: 1px solid rgba(212, 166, 59, 0.3);
+      padding-left: 12px;
+    }
+    #hud-section {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.7px;
+      color: #f4e9d1;
+      white-space: nowrap;
+    }
+
+    /* ALWAYS-VISIBLE QUICK CONTROLS (SPEED x1/x2/x4, PIXEL SLIDER, TOD, CAMERAS) */
+    .marquee-controls {
+      pointer-events: auto;
+      background: var(--bg-marquee);
+      border: 2px solid var(--border-brass);
+      border-radius: 10px;
+      padding: 6px 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+      flex-wrap: wrap;
+    }
+
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: rgba(255,255,255,0.06);
+      padding: 2px;
+      border-radius: 6px;
+    }
+
+    .ctrl-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #e3d6ba;
+      font-family: 'Hanken Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .ctrl-btn:hover {
+      background: rgba(242, 201, 76, 0.16);
+      color: #fff;
+    }
+    .ctrl-btn.active {
+      background: var(--cherry);
+      color: #fff;
+      border-color: #f57d6e;
+      box-shadow: 0 2px 6px rgba(217, 56, 58, 0.45);
+    }
+
+    .pixel-slider-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px;
+      color: #f4e9d1;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    #pixel-slider {
+      width: 66px;
+      accent-color: var(--gold);
+      cursor: pointer;
+    }
+    #pixel-val {
+      color: var(--gold);
+      min-width: 24px;
+      font-weight: 800;
+    }
+
+    /* RIGHT / BOTTOM TICKET-BOOTH PANEL */
+    #ticket-booth-panel {
+      position: fixed;
+      top: 78px;
+      right: 14px;
+      width: 318px;
+      max-height: calc(100vh - 92px);
+      z-index: 20;
+      background: var(--bg-booth);
+      border: 2px solid var(--border-brass);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 12px 34px rgba(0,0,0,0.65);
+      overflow-y: auto;
+      backdrop-filter: blur(6px);
+    }
+
+    #mobile-sheet-toggle {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(212, 166, 59, 0.16);
+      border: 1px solid var(--border-brass-dim);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .booth-section-title {
+      font-family: 'Bevan', serif;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--border-brass);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px dashed var(--border-brass-dim);
+      padding-bottom: 4px;
+    }
+
+    /* CREAM RIDE TICKETS WITH PERFORATIONS & STAMP */
+    #ticket-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ride-ticket {
+      position: relative;
+      display: flex;
+      background: var(--ticket-bg);
+      color: var(--ticket-text);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid #cbb692;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.28);
+    }
+    .ride-ticket:hover {
+      transform: translateY(-2px);
+    }
+    .ride-ticket.active {
+      background: var(--ticket-bg-active);
+      border-color: var(--cherry);
+      box-shadow: 0 6px 16px rgba(217, 56, 58, 0.35);
+    }
+
+    /* Ticket perforation notches */
+    .ride-ticket::before,
+    .ride-ticket::after {
+      content: '';
+      position: absolute;
+      left: 38px;
+      width: 12px;
+      height: 12px;
+      background: var(--bg-booth);
+      border-radius: 50%;
+      z-index: 3;
+    }
+    .ride-ticket::before { top: -7px; }
+    .ride-ticket::after { bottom: -7px; }
+
+    .ticket-stub-left {
+      width: 44px;
+      border-right: 2px dashed rgba(42, 26, 31, 0.35);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      padding: 6px 2px;
+      flex-shrink: 0;
+    }
+    .stub-num {
+      font-family: 'Bevan', serif;
+      font-size: 15px;
+      line-height: 1;
+    }
+    .stub-type {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      opacity: 0.92;
+    }
+
+    .ticket-body {
+      flex: 1;
+      padding: 7px 10px 7px 12px;
+      position: relative;
+    }
+    .ticket-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .ticket-title {
+      font-family: 'Bevan', serif;
+      font-size: 14px;
+      color: #2a1a1f;
+      line-height: 1.1;
+    }
+    .ticket-rating-pill {
+      font-size: 9px;
+      font-weight: 800;
+      background: #2a1a1f;
+      color: var(--gold);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .ticket-subtitle {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6e4e3a;
+      margin: 2px 0 5px 0;
+    }
+    .ticket-mini-stats {
+      display: flex;
+      gap: 8px;
+      font-size: 10px;
+      color: #472918;
+    }
+
+    /* "ON THE TRACK" ink stamp */
+    .on-track-stamp {
+      position: absolute;
+      right: 8px;
+      bottom: 5px;
+      border: 2px solid var(--cherry);
+      color: var(--cherry);
+      font-family: 'Bevan', serif;
+      font-size: 9px;
+      letter-spacing: 0.9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      transform: rotate(-7deg) scale(0.9);
+      opacity: 0;
+      pointer-events: none;
+      background: rgba(255, 248, 232, 0.88);
+      box-shadow: inset 0 0 0 1px rgba(217, 56, 58, 0.25);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .ride-ticket.active .on-track-stamp {
+      opacity: 1;
+      transform: rotate(-7deg) scale(1);
+    }
+
+    /* CHERRY DISPATCH LEVER + BELL */
+    #dispatch-lever-wrap {
+      background: linear-gradient(135deg, #2b1d28, #19111a);
+      border: 2px solid var(--border-brass);
+      border-radius: 10px;
+      padding: 9px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    #dispatch-lever-wrap.ready {
+      border-color: var(--cherry);
+      box-shadow: 0 0 14px rgba(217, 56, 58, 0.35);
+    }
+    #dispatch-lever-wrap:hover {
+      transform: scale(1.01);
+    }
+
+    .lever-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .lever-title {
+      font-family: 'Bevan', serif;
+      font-size: 14px;
+      color: #f4e9d1;
+      letter-spacing: 0.5px;
+    }
+    #lever-status {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--gold);
+      letter-spacing: 0.8px;
+    }
+
+    .cherry-lever-graphic {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: #120c14;
+      border: 1px solid var(--border-brass-dim);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lever-shaft {
+      width: 5px;
+      height: 24px;
+      background: linear-gradient(to right, #b3882d, #f2c94c, #8f6b22);
+      border-radius: 3px;
+      transform-origin: bottom center;
+      transform: rotate(-18deg);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      bottom: -4px;
+    }
+    .lever-knob {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #ff857a, #d9383a 60%, #7a1414);
+      position: absolute;
+      top: -10px;
+      left: -5.5px;
+      box-shadow: 0 2px 6px rgba(217, 56, 58, 0.7);
+    }
+    #dispatch-lever-wrap.pulled .lever-shaft {
+      transform: rotate(28deg);
+    }
+
+    /* COASTER RATINGS & TELEMETRY STATS GRID */
+    .coaster-stats-card {
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid var(--border-brass-dim);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+    #stat-coaster-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+      line-height: 1.32;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dotted rgba(212, 166, 59, 0.2);
+      padding: 2px 0;
+    }
+    .stat-row span:first-child {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .stat-row span:last-child {
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .shortcut-footer {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 8px;
+      justify-content: space-between;
+      padding-top: 2px;
+    }
+    .shortcut-footer kbd {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid var(--border-brass-dim);
+      border-radius: 3px;
+      padding: 0 4px;
+      font-family: inherit;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* CENTER TOAST STAGE ("Loop!", "Airtime!", etc.) */
+    #toast-stage {
+      position: fixed;
+      top: 76px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .coaster-toast {
+      background: rgba(18, 12, 23, 0.92);
+      border: 2px solid var(--gold);
+      border-radius: 10px;
+      padding: 6px 16px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      animation: toastPop 0.24s cubic-bezier(0.18, 1.3, 0.5, 1);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .coaster-toast.fade-out {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.92);
+    }
+    .toast-main {
+      font-family: 'Bevan', serif;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      line-height: 1.1;
+    }
+    .toast-sub {
+      font-size: 11px;
+      font-weight: 700;
+      color: #f4e9d1;
+    }
+    @keyframes toastPop {
+      0% { opacity: 0; transform: translateY(12px) scale(0.8); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* PHONE LAYOUT WITH BOTTOM SHEET */
+    @media (max-width: 820px) {
+      #top-marquee-bar {
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        gap: 5px;
+      }
+      .marquee-brand {
+        padding: 4px 9px;
+      }
+      .brand-title { font-size: 14px; }
+      .marquee-hud {
+        padding: 4px 8px;
+        gap: 9px;
+        width: 100%;
+        justify-content: space-between;
+      }
+      .hud-cell { min-width: 44px; }
+      .hud-val { font-size: 13px; }
+      .hud-section-cell { min-width: 96px; padding-left: 8px; }
+      .marquee-controls {
+        width: 100%;
+        justify-content: space-between;
+        padding: 4px 8px;
+        gap: 4px;
+      }
+      .ctrl-btn { padding: 3px 6px; font-size: 10px; }
+
+      #ticket-booth-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 76vh;
+        border-radius: 16px 16px 0 0;
+        transform: translateY(calc(100% - 118px));
+        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      #ticket-booth-panel.sheet-open {
+        transform: translateY(0);
+      }
+      #mobile-sheet-toggle {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- Top Marquee HUD & Always-Visible Quick Controls -->
+  <header id="top-marquee-bar">
+    <div class="marquee-brand">
+      <div class="brand-bulbs"><span></span><span></span></div>
+      <div>
+        <div class="brand-title">CINDERPINE EXPRESS</div>
+        <div class="brand-sub">Autumn Island Coaster Park</div>
+      </div>
+    </div>
+
+    <div class="marquee-hud">
+      <div class="hud-cell">
+        <span class="hud-label">Speed</span>
+        <div><span id="hud-speed" class="hud-val">0</span><span class="hud-unit">km/h</span></div>
+      </div>
+      <div class="hud-cell">
+        <span class="hud-label">Height</span>
+        <div><span id="hud-height" class="hud-val">2.2</span><span class="hud-unit">m</span></div>
+      </div>
+      <div class="hud-cell hud-g-gauge">
+        <span class="hud-label">Force <b id="hud-g" style="color:#f2c94c">+1.0g</b></span>
+        <div class="g-bar-track"><div id="hud-g-fill"></div></div>
+      </div>
+      <div class="hud-cell">
+        <span class="hud-label">Lap</span>
+        <div><span id="hud-lap" class="hud-val">0.0s</span></div>
+      </div>
+      <div class="hud-cell hud-section-cell">
+        <span class="hud-label">Track Block</span>
+        <div id="hud-section">STATION</div>
+      </div>
+    </div>
+
+    <div class="marquee-controls">
+      <!-- Cameras 1-4 + Quarter Turn -->
+      <div class="ctrl-group" title="Camera Views (Keys 1-4, Q/E)">
+        <button class="ctrl-btn active" data-cam="park">1 Park</button>
+        <button class="ctrl-btn" data-cam="follow">2 Follow</button>
+        <button class="ctrl-btn" data-cam="chase">3 Chase</button>
+        <button class="ctrl-btn" data-cam="fpv">4 Front Seat</button>
+        <button class="ctrl-btn" id="btn-turn-left" title="Quarter-Turn Orbit Left (Q)">↺</button>
+        <button class="ctrl-btn" id="btn-turn-right" title="Quarter-Turn Orbit Right (E)">↻</button>
+      </div>
+
+      <!-- Time of Day -->
+      <div class="ctrl-group" title="Time of Day">
+        <button class="ctrl-btn active" data-tod="day">☀ Day</button>
+        <button class="ctrl-btn" data-tod="dusk">🌅 Dusk</button>
+        <button class="ctrl-btn" data-tod="night">🎆 Night</button>
+      </div>
+
+      <!-- Ride Speed x1/x2/x4 (Always Visible) -->
+      <div class="ctrl-group" title="Simulation Speed (Key X)">
+        <button class="ctrl-btn active" data-speed="1">x1</button>
+        <button class="ctrl-btn" data-speed="2">x2</button>
+        <button class="ctrl-btn" data-speed="4">x4</button>
+      </div>
+
+      <!-- Pixel Size Slider 1-6 px (Always Visible) -->
+      <div class="pixel-slider-box" title="Art Pixel Resolution (1-6 CSS px)">
+        <span>PX</span>
+        <input id="pixel-slider" type="range" min="1" max="6" step="1" value="2" />
+        <span id="pixel-val">2px</span>
+      </div>
+
+      <button class="ctrl-btn" id="btn-mute" title="Toggle WebAudio Sound (Key M)">🔊 Sound</button>
+      <button class="ctrl-btn" id="btn-theme" title="Toggle Ticket Booth Theme">☀️ Booth Cream</button>
+    </div>
+  </header>
+
+  <!-- Toast Stage -->
+  <div id="toast-stage"></div>
+
+  <!-- Ticket Booth Side Panel / Mobile Bottom Sheet -->
+  <aside id="ticket-booth-panel">
+    <div id="mobile-sheet-toggle">
+      <span>🎟️ RIDE TICKETS & DISPATCH BOOTH</span>
+      <span>▲ / ▼</span>
+    </div>
+
+    <!-- Cherry Dispatch Lever -->
+    <div id="dispatch-lever-wrap" class="ready" title="Click or press Space to dispatch train">
+      <div class="lever-info">
+        <div class="lever-title">CHERRY DISPATCH LEVER</div>
+        <div id="lever-status">PULL OR [SPACE] (13s)</div>
+      </div>
+      <div class="cherry-lever-graphic">
+        <div class="lever-shaft"><div class="lever-knob"></div></div>
+      </div>
+    </div>
+
+    <div class="booth-section-title">
+      <span>Select Coaster Ticket</span>
+      <span style="font-family:'Hanken Grotesk',sans-serif;font-size:10px;">Keys [ / ]</span>
+    </div>
+
+    <!-- 3 Perforated Cream Ride Tickets -->
+    <div id="ticket-list"></div>
+
+    <!-- Coaster Ratings & Telemetry -->
+    <div class="booth-section-title">
+      <span id="stat-coaster-name">Old Pinewood</span>
+      <span style="font-family:'Hanken Grotesk',sans-serif;font-size:10px;">Ride Ratings</span>
+    </div>
+    <div class="coaster-stats-card">
+      <div id="stat-coaster-desc"></div>
+      <div class="stats-grid">
+        <div class="stat-row"><span>Excitement</span><span id="stat-excitement">7.6 (HIGH)</span></div>
+        <div class="stat-row"><span>Intensity</span><span id="stat-intensity">6.4</span></div>
+        <div class="stat-row"><span>Nausea</span><span id="stat-nausea">3.1</span></div>
+        <div class="stat-row"><span>Track Length</span><span id="stat-length">210 m</span></div>
+        <div class="stat-row"><span>Max Drop</span><span id="stat-drop">18.2 m</span></div>
+        <div class="stat-row"><span>Top Speed</span><span id="stat-topspeed">66 km/h</span></div>
+        <div class="stat-row"><span>Vert G Range</span><span id="stat-maxg">+3.8g / -0.4g</span></div>
+        <div class="stat-row"><span>Airtime / Inv</span><span><b id="stat-airtime">2.4 s</b> / <b id="stat-inversions">0</b></span></div>
+      </div>
+    </div>
+
+    <div class="shortcut-footer">
+      <span><kbd>WASD</kbd> Walk</span>
+      <span><kbd>E</kbd> Interact</span>
+      <span><kbd>1-4</kbd> Cam</span>
+      <span><kbd>Space</kbd> Dispatch</span>
+      <span><kbd>Q/E</kbd> Orbit</span>
+      <span><kbd>[ ]</kbd> Coaster</span>
+      <span><kbd>X</kbd> Speed</span>
+    </div>
+  </aside>
+
+  <!-- Three.js r128 from cdnjs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Modular Scripts (will be inlined into single HTML file) -->
+  <script src="src/coasters.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/park.js"></script>
+  <script src="src/track_builder.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/story.js"></script>
+  <script>
+    (function() {
+      const CPE = window.CPE;
+      const container = document.getElementById('canvas-container');
+
+      CPE.RENDER.init(container);
+      if (CPE.PARK && CPE.PARK.init) CPE.PARK.init(CPE.RENDER.scene);
+      if (CPE.TRACK_VIEW && CPE.TRACK_VIEW.init) CPE.TRACK_VIEW.init(CPE.RENDER.scene);
+      if (CPE.AUDIO && CPE.AUDIO.init) CPE.AUDIO.init();
+      if (CPE.UI && CPE.UI.init) CPE.UI.init();
+      if (CPE.STORY && CPE.STORY.init) CPE.STORY.init(CPE.RENDER.scene);
+
+      let lastTime = performance.now();
+      let elapsed = 0;
+
+      // Support URL query params for automated visual & telemetry testing:
+      // ?char=maya|noah|alex&coaster=0..2&cam=park|follow|chase|fpv&tod=day|dusk|night&s=65&speed=14&px=2&theme=light
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('char') && CPE.STORY) {
+        CPE.STORY.selectCharacter(params.get('char'), null);
+        if (params.get('nodlg') === '1') CPE.STORY.closeDialogue();
+      }
+      if (params.has('coaster')) {
+        CPE.RIDE.selectCoaster(parseInt(params.get('coaster'), 10) || 0);
+      }
+      if (params.has('tod')) {
+        const tod = params.get('tod');
+        CPE.RENDER.setTimeOfDay(tod);
+        CPE.RENDER.nightFactor = CPE.RENDER.nightTarget;
+        CPE.RENDER.duskFactor = CPE.RENDER.duskTarget;
+        CPE.UI.syncTodButtons();
+      }
+      if (params.has('px')) {
+        const px = parseInt(params.get('px'), 10) || 2;
+        CPE.RENDER.setPixelSize(px);
+        const sl = document.getElementById('pixel-slider');
+        const vl = document.getElementById('pixel-val');
+        if (sl) sl.value = px;
+        if (vl) vl.textContent = px + 'px';
+      }
+      if (params.has('theme') && params.get('theme') === 'light') {
+        document.getElementById('btn-theme').click();
+      }
+      if (params.has('sheet') && params.get('sheet') === '1') {
+        const bp = document.getElementById('ticket-booth-panel');
+        if (bp) bp.classList.add('sheet-open');
+      }
+      if (params.has('s')) {
+        CPE.RIDE.state = 'RIDE';
+        CPE.RIDE.s = parseFloat(params.get('s')) || 0;
+        CPE.RIDE.speed = parseFloat(params.get('speed')) || 14.5;
+        CPE.RIDE.gateOpen = 0;
+        CPE.RIDE.restraintClosed = 1;
+        CPE.RIDE.updateCarMatrices(0.016);
+      }
+      if (params.has('cam')) {
+        CPE.RENDER.setCameraMode(params.get('cam'));
+        CPE.UI.syncCameraButtons();
+        // Pre-warm camera smoothing
+        for (let i = 0; i < 30; i++) CPE.RENDER.update(0.05, i * 0.05);
+      }
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) * 0.001));
+        lastTime = now;
+        elapsed += dt * CPE.RIDE.timeScale;
+
+        CPE.RIDE.update(dt);
+        if (CPE.STORY && CPE.STORY.update) CPE.STORY.update(dt, elapsed);
+        if (CPE.PARK && CPE.PARK.update) CPE.PARK.update(dt * CPE.RIDE.timeScale, elapsed, CPE.RENDER.nightFactor);
+        if (CPE.TRACK_VIEW && CPE.TRACK_VIEW.update) CPE.TRACK_VIEW.update(dt * CPE.RIDE.timeScale, elapsed, CPE.RENDER.nightFactor);
+        if (CPE.AUDIO && CPE.AUDIO.update) CPE.AUDIO.update(dt);
+        CPE.RENDER.update(dt, elapsed);
+        if (CPE.UI && CPE.UI.updateHUD) CPE.UI.updateHUD();
+      }
+
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
